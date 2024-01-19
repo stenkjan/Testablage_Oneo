@@ -1,0 +1,40 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
+  "solution": {
+    "name": "testablage-oneo-client-side-solution",
+    "id": "4f843697-6598-404b-8160-c288d7a8db27",
+    "version": "1.0.0.0",
+    "includeClientSideAssets": true,
+    "skipFeatureDeployment": true,
+    "isDomainIsolated": false,
+    "developer": {
+      "name": "",
+      "websiteUrl": "",
+      "privacyUrl": "",
+      "termsOfUseUrl": "",
+      "mpnId": "Undefined-1.18.2"
+    },
+    "metadata": {
+      "shortDescription": {
+        "default": "testablage-oneo description"
+      },
+      "longDescription": {
+        "default": "testablage-oneo description"
+      },
+      "screenshotPaths": [],
+      "videoUrl": "",
+      "categories": []
+    },
+    "features": [
+      {
+        "title": "testablage-oneo Feature",
+        "description": "The feature that activates elements of the testablage-oneo solution.",
+        "id": "d9b4e0cd-af66-4906-9bd7-9b7f0ea4f3b5",
+        "version": "1.0.0.0"
+      }
+    ]
+  },
+  "paths": {
+    "zippedPackage": "solution/testablage-oneo.sppkg"
+  }
+}

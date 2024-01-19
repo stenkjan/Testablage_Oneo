@@ -1,0 +1,18 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/config.2.0.schema.json",
+  "version": "2.0",
+  "bundles": {
+    "testablage-oneo-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/testablageOneo/TestablageOneoWebPart.js",
+          "manifest": "./src/webparts/testablageOneo/TestablageOneoWebPart.manifest.json"
+        }
+      ]
+    }
+  },
+  "externals": {},
+  "localizedResources": {
+    "TestablageOneoWebPartStrings": "lib/webparts/testablageOneo/loc/{locale}.js"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx/client-side-web-part-manifest.schema.json",
+  "id": "5c3f3b99-2efd-4404-b4fb-fc1ca05fa80e",
+  "alias": "TestablageOneoWebPart",
+  "componentType": "WebPart",
+  "version": "*",
+  "manifestVersion": 2,
+  "requiresCustomScript": false,
+  "supportedHosts": ["SharePointWebPart", "TeamsPersonalApp", "TeamsTab", "SharePointFullPage"],
+  "supportsThemeVariants": true,
+  "preconfiguredEntries": [{
+    "groupId": "5c03119e-3074-46fd-976b-c60198311f70",
+    "group": { "default": "Advanced" },
+    "title": { "default": "TestablageOneo" },
+    "description": { "default": "TestablageOneo description" },
+    "officeFabricIconFontName": "Page",
+    "properties": {
+      "description": "TestablageOneo"
+    }
+  }]
+}
