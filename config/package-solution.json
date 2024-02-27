@@ -1,7 +1,7 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
   "solution": {
-    "name": "testablage-oneo-client-side-solution",
+    "name": "ablage-oneo-client-side-solution",
     "id": "4f843697-6598-404b-8160-c288d7a8db27",
     "version": "1.0.0.0",
     "includeClientSideAssets": true,

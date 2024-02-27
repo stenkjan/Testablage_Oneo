@@ -15,23 +15,24 @@ import TreeItem from '@material-ui/lab/TreeItem';
 import { makeStyles } from '@material-ui/core/styles';
 import { Drawer, TableContainer, Table, TableBody, TableRow, TableCell, IconButton, Typography, TableHead } from '@material-ui/core';
 import MenuIcon from '@material-ui/icons/Menu';
-import { SPHttpClient, SPHttpClientResponse } from '@microsoft/sp-http';
+import { SPHttpClient, /* SPHttpClientResponse */ } from '@microsoft/sp-http';
 import Snackbar from '@material-ui/core/Snackbar';
 import CloseIcon from '@material-ui/icons/Close';
 import FolderIcon from '@material-ui/icons/Folder';
 import { TableSortLabel } from '@material-ui/core';
-import { Box } from '@material-ui/core'; 
+import { Box } from '@material-ui/core';
 import { ExpandMore, ChevronRight } from '@material-ui/icons';
 
-interface NodeData {
-  id: number;
-  name: string;
-}
+// interface NodeData {
+//   id: number;
+//   name: string;
+// }
 
 interface TreeNode {
   value: string;
   nodes?: TreeNode[];
-  data?: NodeData[];
+  data?: any[];
+  level: number;
 }
 
 const useStyles = makeStyles({
@@ -52,8 +53,8 @@ const useStyles = makeStyles({
     top: '-3px',
   },
   treeItemContainer: {
-    display: 'flex', 
-    alignItems: 'center', 
+    display: 'flex',
+    alignItems: 'center',
     color: '#ffffff',
   },
   title: {
@@ -61,7 +62,18 @@ const useStyles = makeStyles({
     color: '#ffffff', // Set the color to white
   },
   table: {
-    border: '1px solid #0078d4',
+    // border: '1px solid #0078d4',
+    width: '100%'
+  },
+  tableHead: {
+    width: '100%',
+  },
+  tableCell: {
+    wordWrap: 'break-word',
+    maxWidth: 203,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
   sortingText: {
     '&.MuiTableSortLabel-root': {
@@ -83,39 +95,65 @@ const useStyles = makeStyles({
 const TestablageOneo: React.FC<ITestablageOneoProps> = (props) => {
   const classes = useStyles();
   const [isTreeViewVisible, setIsTreeViewVisible] = useState(false);
-  const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
+  const [selectedNodes, setSelectedNodes] = useState<(TreeNode | null)[]>([]);
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [gridData, setGridData] = useState<any[]>([]); // Add this line
+  const [expanded, setExpanded] = React.useState<string[]>([]);
+  // New state variable for filtered grid data
+  const [filteredGridData, setFilteredGridData] = useState<any[]>([]);
 
+  const [expandedAtEachLevel, setExpandedAtEachLevel] = useState<(string | null)[]>([]);
 
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [sortBy, setSortBy] = useState('Title');
+  const [isLoading, setIsLoading] = useState(true);
 
   const handleSort = (column: any) => {
     setSortBy(column);
     setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
   };
 
-  const fetchFolder = async (folderUrl: string): Promise<TreeNode> => {
-    const url = `${props.siteUrl}/_api/web/GetFolderByServerRelativeUrl('${folderUrl}')/Folders`;
+  const fetchListTree = async (): Promise<TreeNode[]> => {
+    const listName = 'OneoListe';
+    const url = `${props.siteUrl}/_api/web/lists/getbytitle('${listName}')/items`;
 
     const response = await props.context.spHttpClient.get(url, SPHttpClient.configurations.v1);
     const data = await response.json();
+    console.log(data);
 
-    const nodes: TreeNode[] = await Promise.all(data.value.map(async (folder: any) => {
-      const subFolderUrl = `${folderUrl}/${folder.Name}`;
-      return fetchFolder(subFolderUrl);
-    }));
+    const tree: TreeNode[] = [];
+    const betriebMap: { [key: string]: TreeNode } = {};
 
-    return {
-      value: folderUrl.split('/').pop() || '',
-      nodes,
-    };
-  };
+    data.value.forEach((item: any) => {
+      let betriebNode = betriebMap[item.field_1]; // Betrieb
+      if (!betriebNode) {
+        betriebNode = { value: item.field_1, nodes: [], level: 1 }; // Betrieb
+        betriebMap[item.field_1] = betriebNode; // Betrieb
+        tree.push(betriebNode);
+      }
 
-  const handleLeafClick = (node: any): void => {
-    console.log("Leaf clicked: ", node);
-    setSelectedNode(node);
+      let bereichNode = (betriebNode.nodes?.find(node => node.value === item.field_2)) as TreeNode; // Bereich
+      if (!bereichNode) {
+        bereichNode = { value: item.field_2, nodes: [], level: 2 }; // Bereich
+        betriebNode.nodes?.push(bereichNode);
+      }
+
+      let dokumentenartNode = (bereichNode.nodes?.find(node => node.value === item.field_3)) as TreeNode; // Dokumentenart
+      if (!dokumentenartNode) {
+        dokumentenartNode = { value: item.field_3, nodes: [], level: 3 }; // Dokumentenart
+        bereichNode.nodes?.push(dokumentenartNode);
+      }
+
+      let zusatzNode = (dokumentenartNode.nodes?.find(node => node.value === item.field_4)) as TreeNode; // Zusatz
+      if (!zusatzNode) {
+        zusatzNode = { value: item.field_4, data: [], nodes: [], level: 4 }; // Zusatz
+        dokumentenartNode.nodes?.push(zusatzNode);
+      }
+
+      zusatzNode.data?.push(item);
+    });
+
+    return tree;
   };
 
   const renderTree = (node: TreeNode) => (
@@ -123,19 +161,35 @@ const TestablageOneo: React.FC<ITestablageOneoProps> = (props) => {
       key={node.value}
       nodeId={node.value}
       label={
-        <div className={classes.treeItemContainer}>
+        <div
+          className={classes.treeItemContainer}
+          // onClick={(event) => node && handleLeafClick(event, node)}
+        >
           <Box marginRight={1}>
             <FolderIcon />
           </Box>
           {node.value}
         </div>
       }
+      onClick={(event) => handleLeafClick(event, node)}
+      onIconClick={(event) => onIconClick(event, node)}
       classes={{ label: classes.treeItemLabel }}
       expandIcon={node.nodes && node.nodes.length > 0 ? <ChevronRight className={classes.treeItemIcon} /> : null}
       collapseIcon={node.nodes && node.nodes.length > 0 ? <ExpandMore className={classes.treeItemIcon} /> : null}
-      onClick={() => handleLeafClick(node)}
+      // onIconClick={(event) => {
+      //   event.stopPropagation(); // Stop event propagation
+      //   setExpanded(prev => prev.includes(node.value) ? prev.filter(id => id !== node.value) : [...prev, node.value]);
+      //   // Update selectedNodes state
+      //   let newSelectedNodes: (TreeNode | null)[] = [...selectedNodes];
+      //   newSelectedNodes[node.level - 1] = node;
+      //   // Reset the lower level selections
+      //   for (let i = node.level; i < newSelectedNodes.length; i++) {
+      //     newSelectedNodes[i] = null;
+      //   }
+      //   setSelectedNodes(newSelectedNodes);
+      // }}
     >
-      {Array.isArray(node.nodes) && node.nodes.length > 0 ? node.nodes.map(renderTree) : null}
+      {Array.isArray(node.nodes) ? node.nodes.map(node => renderTree(node)) : null}
     </TreeItem>
   );
 
@@ -153,26 +207,128 @@ const TestablageOneo: React.FC<ITestablageOneoProps> = (props) => {
     setOpen(false);
   };
 
+  const flattenTree = (nodes: TreeNode[]): any[] => {
+    return nodes.reduce((acc: any[], node) => {
+      const nodeData = node.data || [];
+      const childData = node.nodes ? flattenTree(node.nodes) : [];
+      return acc.concat(nodeData, childData);
+    }, []);
+  };
+
+  // Fetch data and set it to gridData in the useEffect hook
   useEffect(() => {
-    const fetchRootFolder = async () => {
-      const rootFolder = await fetchFolder('/sites/Testablage_JS/Dateien');
-      setTree([rootFolder]);
+    console.log('selectedNode changed', selectedNodes);
+    // Add your code that depends on the updated selectedNode state here
+    fetchListTree().then(tree => {
+      setTree(tree);
+      const flatData = flattenTree(tree);
+      setGridData(flatData);
+      setIsLoading(false);
+    });
+  }, [selectedNodes]);
+
+  if (isLoading) {
+    return <div>Laden...</div>;
+  }
+
+  const handleLeafClick = (event: React.MouseEvent, node: TreeNode): void => {
+    event.stopPropagation(); // Stop event propagation
+    let newSelectedNodes: (TreeNode | null)[] = [...selectedNodes];
+    newSelectedNodes[node.level - 1] = node;
+    // If a higher level node is selected, reset the lower level selections
+    for (let i = node.level; i < newSelectedNodes.length; i++) {
+      newSelectedNodes[i] = null;
+    }
+    setSelectedNodes(newSelectedNodes);
+    filterData(newSelectedNodes);
+  
+    // Update the expanded node at the clicked node's level
+    let newExpandedAtEachLevel = [...expandedAtEachLevel];
+    newExpandedAtEachLevel[node.level - 1] = node.value;
+    // If a higher level node is selected, reset the expandedAtEachLevel state for all levels below it
+    for (let i = node.level; i < newExpandedAtEachLevel.length; i++) {
+      newExpandedAtEachLevel[i] = null;
+    }
+    setExpandedAtEachLevel(newExpandedAtEachLevel);
+  
+    // Update the expanded state to include only the expanded nodes at each level
+    setExpanded(newExpandedAtEachLevel.filter(value => value !== null) as string[]);
+  };
+  
+    const onIconClick = (event: React.MouseEvent, node: TreeNode): void => {
+      event.stopPropagation(); // Stop event propagation
+      // Update the expanded node at the clicked node's level
+      let newExpandedAtEachLevel = [...expandedAtEachLevel];
+      newExpandedAtEachLevel[node.level - 1] = node.value;
+      // If a level 1 or level 2 node is clicked, reset the expandedAtEachLevel state for all levels below it
+      if (node.level === 1 || node.level === 2) {
+        for (let i = node.level; i < newExpandedAtEachLevel.length; i++) {
+          newExpandedAtEachLevel[i] = null;
+        }
+      }
+      setExpandedAtEachLevel(newExpandedAtEachLevel);
+    
+      // Update the expanded state to include only the expanded nodes at each level
+      setExpanded(newExpandedAtEachLevel.filter(value => value !== null) as string[]);
+    
+      // Update selectedNodes state
+      let newSelectedNodes: (TreeNode | null)[] = [...selectedNodes];
+      newSelectedNodes[node.level - 1] = node;
+      // Reset the lower level selections
+      for (let i = node.level; i < newSelectedNodes.length; i++) {
+        newSelectedNodes[i] = null;
+      }
+      setSelectedNodes(newSelectedNodes);
+      filterData(newSelectedNodes);
     };
 
-    fetchRootFolder();
+  const findNodeByValue = (value: string, nodes: TreeNode[]): TreeNode | null => {
+    for (let node of nodes) {
+      if (node.value === value) {
+        return node;
+      } else if (node.nodes) {
+        const result = findNodeByValue(value, node.nodes);
+        if (result) {
+          return result;
+        }
+      }
+    }
+    return null;
+  };
+  
+  // Filter the data based on the selected nodes
+  const filterData = (selectedNodes: (TreeNode | null)[]): void => {
+    let filteredData = gridData;
+    if (selectedNodes[0]) {
+      filteredData = filteredData.filter(row => row.field_1 === selectedNodes[0]?.value);
+    }
+    if (selectedNodes[1]) {
+      filteredData = filteredData.filter(row => row.field_2 === selectedNodes[1]?.value);
+    }
+    if (selectedNodes[2]) {
+      filteredData = filteredData.filter(row => row.field_3 === selectedNodes[2]?.value);
+    }
+    if (selectedNodes[3]) {
+      filteredData = filteredData.filter(row => row.field_4 === selectedNodes[3]?.value);
+    }
+    setFilteredGridData(filteredData);
+  };
 
-    const listName = 'Ablageliste';
-    const url = `${props.siteUrl}/_api/web/lists/getbytitle('${listName}')/items`;
-
-    props.context.spHttpClient.get(url, SPHttpClient.configurations.v1)
-      .then((response: SPHttpClientResponse) => response.json())
-      .then((data) => {
-        setGridData(data.value);
-      })
-      .catch((error: any) => {
-        console.error('Error fetching data:', error);
-      });
-  }, []);
+  // Use filteredGridData to render the rows in the table
+  // {
+  //   (selectedNode ? filteredGridData : gridData)
+  //     .sort((a, b) => (a[sortBy] < b[sortBy] ? -1 : 1) * (sortDirection === 'asc' ? 1 : -1))
+  //     .map((row, index) => (
+  //       <TableRow key={index}>
+  //         <TableCell>{row.Title}</TableCell>
+  //         <TableCell>{row.Betrieb}</TableCell>
+  //         <TableCell>{row.Bereich}</TableCell>
+  //         <TableCell>{row.Dokumentenart}</TableCell>
+  //         <TableCell>{row.Zusatz}</TableCell>
+  //         <TableCell>{row.Dateiname}</TableCell>
+  //       </TableRow>
+  //     ))
+  // }
 
   //${hasTeamsContext ? styles.teams : ''}
   return (
@@ -195,15 +351,17 @@ const TestablageOneo: React.FC<ITestablageOneoProps> = (props) => {
           </IconButton>
         </div>
         <Typography variant="h6" className={classes.title}>
-          Dateien
+          SP-Eigenschaften
         </Typography>
-        <TreeView>
+        <TreeView
+          expanded={expanded}
+        >
           {tree.map(renderTree)}
         </TreeView>
       </Drawer>
       <TableContainer>
         <Table className={classes.table}>
-          <TableHead>
+          <TableHead className={classes.tableHead}>
             <TableRow>
               <TableCell className={classes.header}>
                 <TableSortLabel
@@ -217,6 +375,46 @@ const TestablageOneo: React.FC<ITestablageOneoProps> = (props) => {
               </TableCell>
               <TableCell className={classes.header}>
                 <TableSortLabel
+                  active={sortBy === 'Betrieb'}
+                  direction={sortDirection}
+                  className={classes.sortingText}
+                  onClick={() => handleSort('Betrieb')}
+                >
+                  Betrieb
+                </TableSortLabel>
+              </TableCell>
+              <TableCell className={classes.header}>
+                <TableSortLabel
+                  active={sortBy === 'Bereich'}
+                  direction={sortDirection}
+                  className={classes.sortingText}
+                  onClick={() => handleSort('Bereich')}
+                >
+                  Bereich
+                </TableSortLabel>
+              </TableCell>
+              <TableCell className={classes.header}>
+                <TableSortLabel
+                  active={sortBy === 'Dokumentenart'}
+                  direction={sortDirection}
+                  className={classes.sortingText}
+                  onClick={() => handleSort('Dokumentenart')}
+                >
+                  Dokumentenart
+                </TableSortLabel>
+              </TableCell>
+              <TableCell className={classes.header}>
+                <TableSortLabel
+                  active={sortBy === 'Zusatz'}
+                  direction={sortDirection}
+                  className={classes.sortingText}
+                  onClick={() => handleSort('Zusatz')}
+                >
+                  Zusatz
+                </TableSortLabel>
+              </TableCell>
+              <TableCell className={classes.header}>
+                <TableSortLabel
                   active={sortBy === 'Dateiname'}
                   direction={sortDirection}
                   className={classes.sortingText}
@@ -225,78 +423,31 @@ const TestablageOneo: React.FC<ITestablageOneoProps> = (props) => {
                   Dateiname
                 </TableSortLabel>
               </TableCell>
-              <TableCell className={classes.header}>
-                <TableSortLabel
-                  active={sortBy === 'Auftragnummer'}
-                  direction={sortDirection}
-                  className={classes.sortingText}
-                  onClick={() => handleSort('Auftragnummer')}
-                >
-                  Auftragnummer
-                </TableSortLabel>
-              </TableCell>
-              <TableCell className={classes.header}>
-                <TableSortLabel
-                  active={sortBy === 'Erstellt am'}
-                  direction={sortDirection}
-                  className={classes.sortingText}
-                  onClick={() => handleSort('Erstellt am')}
-                >
-                  Erstellt am
-                </TableSortLabel>
-              </TableCell>
-              <TableCell className={classes.header}>
-                <TableSortLabel
-                  active={sortBy === 'Geändert am'}
-                  direction={sortDirection}
-                  className={classes.sortingText}
-                  onClick={() => handleSort('Geändert am')}
-                >
-                  Geändert am
-                </TableSortLabel>
-              </TableCell>
-              <TableCell className={classes.header}>
-                <TableSortLabel
-                  active={sortBy === 'Auftraggeber'}
-                  direction={sortDirection}
-                  className={classes.sortingText}
-                  onClick={() => handleSort('Auftraggeber')}
-                >
-                  Auftraggeber
-                </TableSortLabel>
-              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {/* {console.log(gridData)} */}
-            {gridData
-              .sort((a, b) => (a[sortBy] < b[sortBy] ? -1 : 1) * (sortDirection === 'asc' ? 1 : -1))
-              .map((row, index) => (
-                <TableRow key={index}>
-                  <TableCell>{row.Title}</TableCell>
-                  <TableCell>{row.Dateiname}</TableCell>
-                  <TableCell>{row.Auftragnummer}</TableCell>
-                  <TableCell>
-                    {row.Erstelltam
-                      ? new Date(row.Erstelltam).toLocaleDateString('de-DE', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                      })
-                      : ''}
-                  </TableCell>
-                  <TableCell>
-                    {row.Ge_x00e4_ndertam
-                      ? new Date(row.Ge_x00e4_ndertam).toLocaleDateString('de-DE', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                      })
-                      : ''}
-                  </TableCell>
-                  <TableCell>{row.Auftraggeber}</TableCell>
+            {
+              selectedNodes.length > 0
+                ? (filteredGridData)
+                  .sort((a, b) => (a[sortBy] < b[sortBy] ? -1 : 1) * (sortDirection === 'asc' ? 1 : -1))
+                  .map((row, index) => {
+                    console.log('row:', row);
+                    return (
+                      <TableRow key={index}>
+                        <TableCell className={classes.tableCell}>{row.Title}</TableCell>
+                        <TableCell className={classes.tableCell}>{row.field_1}</TableCell>
+                        <TableCell className={classes.tableCell}>{row.field_2}</TableCell>
+                        <TableCell className={classes.tableCell}>{row.field_3}</TableCell>
+                        <TableCell className={classes.tableCell}>{row.field_4}</TableCell>
+                        <TableCell className={classes.tableCell}>{row.field_5}</TableCell>
+                      </TableRow>
+                    );
+                  })
+                : <TableRow>
+                  <TableCell colSpan={7}>Bitte treffen Sie zuerst eine Auswahl.</TableCell>
                 </TableRow>
-              ))}
+            }
           </TableBody>
         </Table>
       </TableContainer>
@@ -304,7 +455,7 @@ const TestablageOneo: React.FC<ITestablageOneoProps> = (props) => {
         open={open}
         autoHideDuration={6000}
         onClose={handleClose}
-        message={`Selected node: ${selectedNode ? selectedNode.value : 'None'}`}
+        message={`Selected node: ${selectedNodes ? selectedNodes[0]?.value : 'None'}`}
         action={
           <React.Fragment>
             <IconButton size="small" aria-label="close" color="inherit" onClick={handleClose}>
